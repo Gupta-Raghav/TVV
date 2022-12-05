@@ -1,23 +1,21 @@
-import logo from './logo.svg';
-import './App.css';
+
+import AppRouter  from './Router/AppRouter';
+
+import MultilineChart from "./components/Charts/MultiLine";
+import MultiChart from "./components/Charts/MultiChart";
+import schc from "./components/Charts/SCHC.json";
+import vcit from "./components/Charts/VCIT.json";
+import portfolio from "./components/Charts/portfolio.json";
+import Landing from "./components/landing/Landing";
+import Navbar from "./components/Navbar/navbar";
+import SignIn from "./components/Singnin/Signin";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div >
+      <AppRouter/>
+      {/* <MultiChart/> */}
+      {/* <AppRouter /> */}
     </div>
   );
 }
