@@ -5,8 +5,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList 
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 export default function Race() {
-  const [startDate, setStartDate] = useState(new Date('2012/01/1'));
-  const [endDate, setendDate] = useState(new Date('2014 /12/1'));
+  const [startDate, setStartDate] = useState(new Date('2016/01/1'));
+  const [endDate, setendDate] = useState(new Date('2017/01/1'));
   const [data, setData] = useState( );
   const [make, setmake] = useState(new Set());
   useEffect(() => {

@@ -1,12 +1,13 @@
 import axios from 'axios';
 import {React,useState,useEffect} from 'react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import Piechart from './pieChart';
+import DatePicker from 'react-datepicker';
 import './styles.css';
 
 export default function Seasons () {
   const [toggle, settoggle] = useState(true);
-
+  const [startDate, setStartDate] = useState(new Date('2015/01/1'));
+  const [endDate, setendDate] = useState(new Date('2022/12/1'));
   const dummyData = [
     {
       name: 'Page A',
@@ -17,7 +18,11 @@ export default function Seasons () {
   ];
   const [data, setData] = useState(dummyData);
   useEffect(() => {
-    axios.post('http://localhost:5000/api/q1').then((response)=>{
+    let variable ={
+      startDate:startDate.toLocaleDateString('en-uk'),
+      endDate:endDate.toLocaleDateString('en-uk')
+    }
+    axios.post('http://localhost:5000/api/q1',variable).then((response)=>{
       const rows = response.data.rows;
       const map = new Map();
       for(let i=0;i<rows.length;i++){
@@ -50,11 +55,28 @@ export default function Seasons () {
       setData(array);
       console.log(array)
     })
-  }, [])
+  }, [startDate,endDate])
     return (
       <div className='container'>
-      <button onClick={()=> settoggle(!toggle)}>barChart</button>
-      {toggle ? <BarChart
+        <div className='date'>
+       <label>Start-Date</label>
+      <DatePicker
+       selected={startDate}
+       onChange={(d) => setStartDate(d)}
+       Format="dd/MM/yyyy"
+       showMonthYearPicker
+       showFullMonthYearPicker
+    />
+    <label>End-Date</label>
+    <DatePicker
+       selected={endDate}
+       onChange={(d) => setendDate(d)}
+       Format="dd/MM/yyyy"
+       showMonthYearPicker
+       showFullMonthYearPicker
+    />
+       </div>
+      <BarChart
       width={700}
       height={500}
       data={data}
@@ -74,8 +96,7 @@ export default function Seasons () {
       <Bar dataKey="Spring" stackId="a" fill="#3aff55" />
       <Bar dataKey="Summer" stackId="a" fill="#ff4000" />
       <Bar dataKey="Winter" stackId="a" fill="#0080ff" />
-    </BarChart> :
-      <Piechart/>}
+    </BarChart> 
       </div>
     );
   }

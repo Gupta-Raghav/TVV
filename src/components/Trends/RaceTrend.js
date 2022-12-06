@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 export default function Race() {
-  const [startDate, setStartDate] = useState(new Date('2012/01/1'));
+  const [startDate, setStartDate] = useState(new Date('2015/01/1'));
   const [endDate, setendDate] = useState(new Date('2022/12/1'));
   const [toggle, settoggle] = useState(true);
   const [data, setData] = useState( );
@@ -21,7 +21,7 @@ export default function Race() {
       endDate:endDate.toLocaleDateString('en-uk')
     }
     // console.log(variable);
-    axios.post('http://localhost:5000/api/q3',variable).then((response)=>{
+    axios.post('http://localhost:5000/api/q2',variable).then((response)=>{
       const rows = response.data.rows;
       const map = new Map();
       for(let i = 0; i<rows.length; i++) {

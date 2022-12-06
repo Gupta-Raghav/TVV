@@ -58,7 +58,9 @@ app.post('/api/q1', async function(req, res) {
            FROM "ALIYA.ABDULLAH".violation v ,
                 "ALIYA.ABDULLAH".factors f
            WHERE f.factorid = v.factorid
-             AND f.fatal = 'Yes')
+             AND f.fatal = 'Yes'
+             and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+             )
         GROUP BY YEAR,
                  season
         ORDER BY YEAR,
@@ -82,12 +84,13 @@ app.post('/api/q1', async function(req, res) {
            FROM dual CONNECT BY LEVEL <= 12) sea ON sea.MONTH = EXTRACT(MONTH
                                                                         FROM v.date_time)
         WHERE f.fatal = 'Yes'
+        and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
         GROUP BY EXTRACT(YEAR
                          FROM v.date_time)
         ORDER BY YEAR) yearTotal
      WHERE yearTotal.year = YearSeasonTotal.year
      `,
-            {},
+     [req.body.startDate,req.body.endDate,req.body.startDate,req.body.endDate],
             {
                 outFormat: oracledb.OBJECT
             }
@@ -206,12 +209,14 @@ app.post('/api/q3', async function(req, res) {
             `SELECT YEAR,
             quarter,
             make,
-            count(*) COUNT 
+            count(*) COUNT
      FROM
        (SELECT extract(YEAR FROM v.date_time) YEAR, quarters.quarter, vt.make
         FROM "ALIYA.ABDULLAH".violation v
             JOIN "ALIYA.ABDULLAH".driver drv ON v.seqid=drv.seqid
-            JOIN "ALIYA.ABDULLAH".VehicleType vt ON drv.vid=vt.vid,
+            JOIN "ALIYA.ABDULLAH".VehicleType vt ON drv.vid=vt.vid
+            JOIN "ALIYA.ABDULLAH".factors fac
+                        on v.factorid = fac.factorid,
               (SELECT LEVEL AS MONTH,
                      CASE 
                          WHEN LEVEL BETWEEN 1 AND 3 THEN '1st quarter' 
@@ -221,30 +226,34 @@ app.post('/api/q3', async function(req, res) {
                      END AS quarter
                FROM dual CONNECT BY LEVEL <= 12
                ) quarters
-        WHERE quarters.month = extract(MONTH FROM v.date_time)
+        WHERE fac.personal_injury='Yes' AND quarters.month = extract(MONTH FROM v.date_time)
         AND v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
         AND vt.make IN
-     -- START get top 5 unsafe vehicles manufacturers
-     (select make from (SELECT make, count(*) count
-            FROM "ALIYA.ABDULLAH".VehicleType vt
-                JOIN
-                  (SELECT *
-                   FROM "ALIYA.ABDULLAH".violation v
-                   JOIN "ALIYA.ABDULLAH".driver drv 
-                   ON v.seqid=drv.seqid
-                   where v.date_time between 
-                        to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
-                    ) drivers 
-                ON drivers.vid=vt.vid
-            GROUP BY make HAVING COUNT(*)>=100
-            ORDER BY COUNT DESC)
-            FETCH FIRST 5 ROWS ONLY)
+     -- START get top 10 unsafe vehicles manufacturers
+            (select make from (SELECT make, count(*) count
+                 FROM "ALIYA.ABDULLAH".VehicleType vt
+                     JOIN
+                       (SELECT *
+                        FROM "ALIYA.ABDULLAH".violation v
+                        JOIN "ALIYA.ABDULLAH".driver drv 
+                        ON v.seqid=drv.seqid
+                        JOIN "ALIYA.ABDULLAH".factors fac
+                        on v.factorid = fac.factorid
+                        where fac.personal_injury='Yes'
+                        and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+                         ) drivers 
+                     ON drivers.vid=vt.vid
+                 GROUP BY make HAVING COUNT(*)>=100
+                 ORDER BY COUNT DESC)
+                 FETCH FIRST 5 ROWS ONLY)
      -- END
        )
      GROUP BY YEAR,
               quarter,
               make
-     ORDER BY YEAR, quarter, make
+     ORDER BY YEAR,
+              quarter,
+              make
      `,
             [ req.body.startDate, req.body.endDate,req.body.startDate, req.body.endDate ],
             {
@@ -271,35 +280,38 @@ app.post('/api/q4', async function(req, res) {
         conn = await oracledb.getConnection(config);
 
         const result = await conn.execute(
-            `SELECT extract(YEAR
-                FROM v.date_time) YEAR,
-                                  quarters.quarter,
-                                  a.district,
-                                  count(*) AS COUNT
- FROM "ALIYA.ABDULLAH".violation v,"ALIYA.ABDULLAH".agency a,
-   (SELECT LEVEL AS MONTH,
-                    CASE
-                        WHEN LEVEL BETWEEN 1 AND 3 THEN '1st quarter'
-                        WHEN LEVEL BETWEEN 4 AND 6 THEN '2nd quarter'
-                        WHEN LEVEL BETWEEN 7 AND 9 THEN '3rd quarter'
-                        WHEN LEVEL BETWEEN 10 AND 12 THEN'4th quarter'
-                    END AS quarter
-    FROM dual CONNECT BY LEVEL <= 12) quarters
- WHERE v.agencyid = a.agencyid
-   AND a.district IN
-     (SELECT a.district
-      FROM "ALIYA.ABDULLAH".violation v,
-           "ALIYA.ABDULLAH".agency a
-      WHERE v.agencyid = a.agencyid
-        AND a.district LIKE '%District%')
-   AND quarters.month = extract(MONTH
-                                FROM v.date_time)
- GROUP BY extract(YEAR
-                  FROM v.date_time),
-          quarters.quarter,
-          a.district
-          order By YEAR, quarter `,
-            {},
+            `
+            SELECT extract(YEAR
+                            FROM v.date_time) YEAR,
+                                              quarters.quarter,
+                                              a.district,
+                                              count(*) AS COUNT
+             FROM "ALIYA.ABDULLAH".violation v,"ALIYA.ABDULLAH".agency a,
+               (SELECT LEVEL AS MONTH,
+                                CASE
+                                    WHEN LEVEL BETWEEN 1 AND 3 THEN '1st quarter'
+                                    WHEN LEVEL BETWEEN 4 AND 6 THEN '2nd quarter'
+                                    WHEN LEVEL BETWEEN 7 AND 9 THEN '3rd quarter'
+                                    WHEN LEVEL BETWEEN 10 AND 12 THEN'4th quarter'
+                                END AS quarter
+                FROM dual CONNECT BY LEVEL <= 12) quarters
+             WHERE v.agencyid = a.agencyid
+             and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+               AND a.district IN
+                 (SELECT a.district
+                  FROM "ALIYA.ABDULLAH".violation v,
+                       "ALIYA.ABDULLAH".agency a
+                  WHERE v.agencyid = a.agencyid
+                  and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+                    AND a.district LIKE '%District%')
+               AND quarters.month = extract(MONTH
+                                            FROM v.date_time)
+             GROUP BY extract(YEAR
+                              FROM v.date_time),
+                      quarters.quarter,
+                      a.district
+                      order By YEAR, quarter `,
+                      [ req.body.startDate, req.body.endDate,req.body.startDate, req.body.endDate ],
             {
                 outFormat: oracledb.OBJECT
             }
@@ -324,34 +336,38 @@ app.post('/api/q5', async function(req, res) {
         conn = await oracledb.getConnection(config);
 
         const result = await conn.execute(
-            `SELECT extract(YEAR
-                FROM v.date_time) YEAR,
-                                  quarters.quarter,
-                                  a.district,
-                                  count(*) AS COUNT
- FROM "ALIYA.ABDULLAH".violation v,"ALIYA.ABDULLAH".agency a,
-   (SELECT LEVEL AS MONTH,
-                    CASE
-                        WHEN LEVEL BETWEEN 1 AND 3 THEN '1st quarter'
-                        WHEN LEVEL BETWEEN 4 AND 6 THEN '2nd quarter'
-                        WHEN LEVEL BETWEEN 7 AND 9 THEN '3rd quarter'
-                        WHEN LEVEL BETWEEN 10 AND 12 THEN'4th quarter'
-                    END AS quarter
-    FROM dual CONNECT BY LEVEL <= 12) quarters
- WHERE v.agencyid = a.agencyid
-   AND a.district IN
-     (SELECT a.district
-      FROM "ALIYA.ABDULLAH".violation v,
-           "ALIYA.ABDULLAH".agency a
-      WHERE v.agencyid = a.agencyid
-        AND a.district LIKE '%District%')
-   AND quarters.month = extract(MONTH
-                                FROM v.date_time)
- GROUP BY extract(YEAR
-                  FROM v.date_time),
-          quarters.quarter,
-          a.district `,
-            {},
+            `select year, description, cnt, prv, (cnt-prv)*100/prv change from (
+                select year, description, cnt, lag(cnt,1) over (PARTITION BY description order by description) prv
+                from (
+                select
+                extract(year from v.date_time) year,
+                case
+                    WHEN v.description like '%EXCESS%SPEED%' or description like '%SPEED%LIMIT%' OR v.Description LIKE '%SPEED ON HIGHWAY%' THEN 'OVER-SPEEDING'
+                    WhEN REGEXP_LIKE (description, '\d* (IN A) \d*') THEN 'OVER-SPEEDING'
+                    WHEN description like '%UNDER%INFLUENCE%' THEN 'DUI'
+                    WHEN description like '%LIGHT%INOP%' OR  v.Description LIKE '%ILLUMINATING DEVICE%' OR v.Description LIKE '%PLATE ILLUMINATION%' OR v.Description LIKE '%LIGHTED FRONT LAMPS%' OR v.Description LIKE '%STOP LAMP%' OR v.Description LIKE '%HEADLAMPS%' THEN 'BROKEN LIGHTS'
+                    WHEN v.Description LIKE '%HANDHELD TELEPHONE%' OR v.Description LIKE '%ELECTRONIC MSG%' THEN 'MOBILE'
+                    WHEN v.Description LIKE '%EXPIRED REGISTRAION%' OR v.Description LIKE '%SUSPENDED REGISTRATION%' OR  v.Description LIKE '%SUSPENDED LICENSE%' OR v.Description LIKE '%REGISTRATION PLATES%' OR v.Description LIKE '%REGISTRATION CARD%' OR v.Description LIKE '%DISPLAY LICENSE%' THEN 'REGISTRATION'
+                    WHEN v.Description LIKE '%STOP SIGN%' OR v.Description LIKE '%STOP AT SIGN%' THEN 'STOPSIGN'
+                end description,
+                count(*) cnt
+                from "ALIYA.ABDULLAH".violation v
+                where description is not null 
+                and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+                group by extract(year from v.date_time),
+                case
+                    WHEN v.description like '%EXCESS%SPEED%' or description like '%SPEED%LIMIT%' OR v.Description LIKE '%SPEED ON HIGHWAY%' THEN 'OVER-SPEEDING'
+                    WhEN REGEXP_LIKE (description, '\d* (IN A) \d*') THEN 'OVER-SPEEDING'
+                    WHEN description like '%UNDER%INFLUENCE%' THEN 'DUI'
+                    WHEN description like '%LIGHT%INOP%' OR  v.Description LIKE '%ILLUMINATING DEVICE%' OR v.Description LIKE '%PLATE ILLUMINATION%' OR v.Description LIKE '%LIGHTED FRONT LAMPS%' OR v.Description LIKE '%STOP LAMP%' OR v.Description LIKE '%HEADLAMPS%' THEN 'BROKEN LIGHTS'
+                    WHEN v.Description LIKE '%HANDHELD TELEPHONE%' OR v.Description LIKE '%ELECTRONIC MSG%' THEN 'MOBILE'
+                    WHEN v.Description LIKE '%EXPIRED REGISTRAION%' OR v.Description LIKE '%SUSPENDED REGISTRATION%' OR  v.Description LIKE '%SUSPENDED LICENSE%' OR v.Description LIKE '%REGISTRATION PLATES%' OR v.Description LIKE '%REGISTRATION CARD%' OR v.Description LIKE '%DISPLAY LICENSE%' THEN 'REGISTRATION'
+                    WHEN v.Description LIKE '%STOP SIGN%' OR v.Description LIKE '%STOP AT SIGN%' THEN 'STOPSIGN'
+                end
+                order by year, description)
+                where description is not null and year between 2013 and 2023
+                order by description, year)`,
+            [req.body.startDate,req.body.endDate],
             {
                 outFormat: oracledb.OBJECT
             }
