@@ -171,6 +171,32 @@ app.post('/api/q2', async function(req, res) {
     }
 });
 
+app.post('/api/qa', async function(req, res) {
+    //res.send({ express: 'Hello From Express' });
+    let conn;
+    try {
+        conn = await oracledb.getConnection(config);
+        
+        const result = await conn.execute(
+            `select count(*) count FROM "ALIYA.ABDULLAH".violation v`,
+            {},
+            {
+                outFormat: oracledb.OBJECT
+            }
+        );
+        
+        res.send(JSON.stringify(result));
+        //console.log(result);
+    } catch (err) {
+        console.log('Ouch!', err);
+    } finally {
+        if (conn) {
+            // conn assignment worked, need to close
+            await conn.close();
+        }
+    }
+});
+
 // app.get('/api/q21', async function(req, res) {
 //     //res.send({ express: 'Hello From Express' });
 //     let conn;
