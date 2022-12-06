@@ -3,9 +3,11 @@ import Navbar from "../components/Navbar/navbar";
 import About from "../components/about/about";
 import RaceTrend from "../components/Trends/RaceTrend";
 import SeasonsTrend from "../components/Trends/SeasonsTrend";
+import District from "../components/Trends/District";
 // import Projects from "../components/Projects/Projects";
 // import Footer from "./components/Footer";
 // import Resume from "./components/Resume/ResumeNew";
+import Vehicle from '../components/Trends/Vehicle.js';
 import {
   BrowserRouter as Router,
   Route,
@@ -34,6 +36,8 @@ function App() {
           <Route path="/" element={<Landing />} exact={true}/>
           <Route path="/about" element={<About />} />
           <Route path="/Race" element={<RaceTrend />} />
+          <Route path="/Vehicle_safety" element={<Vehicle />} />
+          <Route path="/district" element={<District/>} />
           <Route path="/Seasons" element={<SeasonsTrend />} />
           <Route path="*" element={<Navigate to="/"/>} />
         </Routes>

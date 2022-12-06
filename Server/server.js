@@ -112,44 +112,45 @@ app.post('/api/q2', async function(req, res) {
     let conn;
     try {
         conn = await oracledb.getConnection(config);
-
+        console.log(req);
+        console.log(req.body.startDate);
+        console.log(req.body.endDate);
         const result = await conn.execute(
-            `SELECT extract(YEAR
-                FROM v.date_time) as Year,
-        extract(MONTH
-                FROM v.date_time) as Month,
-        race,
-        count(*) as Count
- FROM
-   (SELECT *
-    FROM "ALIYA.ABDULLAH".violation v,
-         "ALIYA.ABDULLAH".penalcode pc
-    WHERE pc.title IN
-        (SELECT title
-         FROM
-           (SELECT title,
-                   count(*) AS COUNT
-            FROM "ALIYA.ABDULLAH".violation v,
-                 "ALIYA.ABDULLAH".penalcode pc
-            WHERE v.charge = pc.pcid --and pc.title='21'
- 
-            GROUP BY pc.title
-            ORDER BY COUNT DESC FETCH FIRST 10 ROWS ONLY) --where rownum <= 10
- )
-      AND v.charge = pc.pcid) v ,
-                              "ALIYA.ABDULLAH".driver drv
- WHERE drv.seqid = v.seqid
- GROUP BY extract(YEAR
-                  FROM v.date_time),
-          extract(MONTH
-                  FROM v.date_time),
-          race
- ORDER BY extract(YEAR
-                  FROM v.date_time),
-          extract(MONTH
-                  FROM v.date_time),
-          race`,
-            {},
+            `SELECT extract(YEAR FROM v.date_time) year,
+            extract(MONTH FROM v.date_time) month,
+            race,
+            count(*) count
+     FROM
+     -- START select violations that occured in the top 10 penal codes
+       (SELECT *
+        FROM "ALIYA.ABDULLAH".violation v,
+             "ALIYA.ABDULLAH".penalcode pc
+        WHERE pc.title IN
+     -- START select top 10 penal codes that violations are related to
+            (SELECT title
+             FROM
+               (SELECT title,
+                       count(*) AS COUNT
+                FROM "ALIYA.ABDULLAH".violation v,
+                     "ALIYA.ABDULLAH".penalcode pc
+                WHERE v.charge = pc.pcid 
+                and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+                GROUP BY pc.title
+                ORDER BY COUNT DESC FETCH FIRST 10 ROWS ONLY)
+             )
+     -- END
+        AND v.charge = pc.pcid) v,
+     -- END, now join with driver to get race of the violator
+         "ALIYA.ABDULLAH".driver drv
+         WHERE drv.seqid = v.seqid
+         and v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+     GROUP BY extract(YEAR FROM v.date_time),
+              extract(MONTH FROM v.date_time),
+              race
+     ORDER BY extract(YEAR FROM v.date_time),
+              extract(MONTH FROM v.date_time),
+              race`,
+            [req.body.startDate,req.body.endDate,req.body.startDate,req.body.endDate],
             {
                 outFormat: oracledb.OBJECT
             }
@@ -198,43 +199,54 @@ app.post('/api/q3', async function(req, res) {
     let conn;
     try {
         conn = await oracledb.getConnection(config);
-        let st = req.state;
-        let pol = req.pollutant;
-        console.log(req.body.pollutant);
+        // let st = req.state;
+        // let pol = req.pollutant;
+        console.log(req.body);
         const result = await conn.execute(
             `SELECT YEAR,
             quarter,
             make,
-            count(*) COUNT
+            count(*) COUNT 
      FROM
-       (SELECT extract(YEAR
-                       FROM v.date_time) YEAR,
-                                         quarters.quarter,
-                                         vt.make
+       (SELECT extract(YEAR FROM v.date_time) YEAR, quarters.quarter, vt.make
         FROM "ALIYA.ABDULLAH".violation v
-        JOIN "ALIYA.ABDULLAH".driver drv ON v.seqid=drv.seqid
-        JOIN "ALIYA.ABDULLAH".VehicleType vt ON drv.vid=vt.vid,
-          (SELECT LEVEL AS MONTH,
-                           CASE WHEN LEVEL BETWEEN 1 AND 3 THEN '1st quarter' WHEN LEVEL BETWEEN 4 AND 6 THEN '2nd quarter' WHEN LEVEL BETWEEN 7 AND 9 THEN '3rd quarter' WHEN LEVEL BETWEEN 10 AND 12 THEN'4th quarter' END AS quarter
-           FROM dual CONNECT BY LEVEL <= 12) quarters
-        WHERE quarters.month = extract(MONTH
-                                       FROM v.date_time)
-          AND vt.make IN
-            (SELECT make AS COUNT
-             FROM "ALIYA.ABDULLAH".VehicleType vt
-             JOIN
-               (SELECT *
-                FROM "ALIYA.ABDULLAH".violation v
-                JOIN "ALIYA.ABDULLAH".driver drv ON v.seqid=drv.seqid) drivers ON drivers.vid=vt.vid
-             GROUP BY make HAVING COUNT(*)>=100
-             ORDER BY COUNT DESC FETCH FIRST 10 ROWS ONLY))
+            JOIN "ALIYA.ABDULLAH".driver drv ON v.seqid=drv.seqid
+            JOIN "ALIYA.ABDULLAH".VehicleType vt ON drv.vid=vt.vid,
+              (SELECT LEVEL AS MONTH,
+                     CASE 
+                         WHEN LEVEL BETWEEN 1 AND 3 THEN '1st quarter' 
+                         WHEN LEVEL BETWEEN 4 AND 6 THEN '2nd quarter' 
+                         WHEN LEVEL BETWEEN 7 AND 9 THEN '3rd quarter' 
+                         WHEN LEVEL BETWEEN 10 AND 12 THEN'4th quarter' 
+                     END AS quarter
+               FROM dual CONNECT BY LEVEL <= 12
+               ) quarters
+        WHERE quarters.month = extract(MONTH FROM v.date_time)
+        AND v.date_time between to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+        AND vt.make IN
+     -- START get top 5 unsafe vehicles manufacturers
+     (select make from (SELECT make, count(*) count
+            FROM "ALIYA.ABDULLAH".VehicleType vt
+                JOIN
+                  (SELECT *
+                   FROM "ALIYA.ABDULLAH".violation v
+                   JOIN "ALIYA.ABDULLAH".driver drv 
+                   ON v.seqid=drv.seqid
+                   where v.date_time between 
+                        to_date(:startDate,'dd/mm/yyyy') and to_date(:endDate,'dd/mm/yyyy')
+                    ) drivers 
+                ON drivers.vid=vt.vid
+            GROUP BY make HAVING COUNT(*)>=100
+            ORDER BY COUNT DESC)
+            FETCH FIRST 5 ROWS ONLY)
+     -- END
+       )
      GROUP BY YEAR,
               quarter,
               make
-     ORDER BY make,
-              YEAR,
-              quarter`,
-            [ req.body.pollutant, req.body.state ],
+     ORDER BY YEAR, quarter, make
+     `,
+            [ req.body.startDate, req.body.endDate,req.body.startDate, req.body.endDate ],
             {
                 outFormat: oracledb.OBJECT
             }
@@ -285,7 +297,8 @@ app.post('/api/q4', async function(req, res) {
  GROUP BY extract(YEAR
                   FROM v.date_time),
           quarters.quarter,
-          a.district `,
+          a.district
+          order By YEAR, quarter `,
             {},
             {
                 outFormat: oracledb.OBJECT

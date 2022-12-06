@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 // import Modal from '../Modal/Modal';
 import Modal from '@mui/material/Modal';
 import axios from 'axios';
+import { image } from 'd3';
 const style = {
   position: 'absolute',
   top: '50%',
@@ -22,7 +23,7 @@ const style = {
   boxShadow: 24,
   p: 4,
 };
-export default function ImgMediaCard({Name, description}) {
+export default function ImgMediaCard({Name,image, description}) {
   const [open, setOpen] = React.useState(false);
   const fetchData = () => {
     axios.get()
@@ -31,13 +32,13 @@ export default function ImgMediaCard({Name, description}) {
     <Card sx={{ maxWidth: 345 }}>
       <CardMedia
         component="img"
-        alt="green iguana"
+        alt="Violations"
         height="140"
-        image={carimage2}
+        image={image}
       />
       <CardContent>
         <Typography gutterBottom variant="h5" component="div">
-          asdasjdn
+          {Name}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           {description}

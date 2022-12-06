@@ -1,8 +1,11 @@
 import axios from 'axios';
 import React, { useState,useEffect} from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 export default function Race() {
+  const [startDate, setStartDate] = useState(new Date('2012/01/1'));
+  const [endDate, setendDate] = useState(new Date('2022/12/1'));
   const [toggle, settoggle] = useState(true);
   const [data, setData] = useState( );
   const [Black, setBlack] = useState(true);
@@ -13,7 +16,12 @@ export default function Race() {
   const [oth, setoth] = useState(false);
 
   useEffect(() => {
-    axios.post('http://localhost:5000/api/q2').then((response)=>{
+    let variable ={
+      startDate:startDate.toLocaleDateString('en-uk'),
+      endDate:endDate.toLocaleDateString('en-uk')
+    }
+    // console.log(variable);
+    axios.post('http://localhost:5000/api/q3',variable).then((response)=>{
       const rows = response.data.rows;
       const map = new Map();
       for(let i = 0; i<rows.length; i++) {
@@ -53,10 +61,29 @@ export default function Race() {
       setData(array);
       // console.log(map);
       })
-    }, [])
+    }, [startDate,endDate])
+
     return (
       <div className="container">
       <div >
+       <div className='date'>
+       <label>Start-Date</label>
+      <DatePicker
+       selected={startDate}
+       onChange={(d) => setStartDate(d)}
+       Format="dd/MM/yyyy"
+       showMonthYearPicker
+       showFullMonthYearPicker
+    />
+    <label>End-Date</label>
+    <DatePicker
+       selected={endDate}
+       onChange={(d) => setendDate(d)}
+       Format="dd/MM/yyyy"
+       showMonthYearPicker
+       showFullMonthYearPicker
+    />
+       </div>
         <LineChart
           width={1300}
           height={500}
